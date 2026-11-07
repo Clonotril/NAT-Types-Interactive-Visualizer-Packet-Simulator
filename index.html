@@ -51,12 +51,6 @@
             position: relative;
             box-shadow: 0 0 35px -5px rgba(16, 185, 129, 0.08), inset 0 0 20px rgba(0, 0, 0, 0.7);
         }
-        .matrix-cell-hover:hover {
-            transform: scale(1.02);
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
-            box-shadow: 0 0 12px rgba(255, 255, 255, 0.15);
-            cursor: pointer;
-        }
         /* Top-right reset alert notification animation */
         @keyframes notifySlideInRight {
             0% {
@@ -157,7 +151,7 @@
     <!-- Main Workspace -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
 
-        <!-- NAT Type Selection Ribbon (Matches Diagram) -->
+        <!-- NAT Type Selection Ribbon -->
         <section id="tour-step-nat-ribbon" class="bg-slate-900/90 rounded-xl p-4 border border-slate-800 shadow-lg">
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-2">
@@ -372,16 +366,16 @@
             </section>
         </div>
 
-        <!-- Comparative Matrices (Matches Diagram Exactly) -->
+        <!-- Comparative Matrices -->
         <section id="tour-step-matrix" class="space-y-6">
-            <!-- 1. "Who can send inbound traffic?" Matrix -->
+            <!-- 1. "Who can send inbound traffic?" Matrix (Static Reference) -->
             <div class="bg-slate-900/90 rounded-xl p-4 sm:p-5 border border-slate-800 shadow-xl">
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div>
                         <h2 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                             <i class="fa-solid fa-table-cells text-emerald-400"></i> Who can send inbound traffic?
                         </h2>
-                        <p class="text-xs text-slate-400 mt-0.5">Click any interactive cell below to automatically test that exact condition on the live canvas!</p>
+                        <p class="text-xs text-slate-400 mt-0.5">Reference summary comparing inbound firewall behavior across NAT architectures.</p>
                     </div>
                     <!-- Prominent Highlight Badge for Architecture Role Definition -->
                     <div id="matrix-role-badge" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 via-amber-400/10 to-amber-500/20 border-2 border-amber-400/60 shadow-[0_0_15px_rgba(245,158,11,0.15)] text-xs font-mono">
@@ -407,82 +401,82 @@
                         </thead>
                         <tbody class="divide-y divide-slate-800 text-xs font-semibold">
                             <!-- Row 1: Known IP, same port -->
-                            <tr class="hover:bg-slate-800/40 transition">
+                            <tr class="hover:bg-slate-800/20 transition">
                                 <td class="p-3 text-left font-sans text-slate-200">
                                     <div class="font-bold">Known IP, same port</div>
                                     <div id="matrix-sub-known-same" class="text-[10px] text-slate-400 font-mono font-normal">e.g., 8.8.8.8:80 replying</div>
                                 </td>
                                 <td class="p-2">
-                                    <button onclick="triggerScenario('full-cone', 'a-reply-same')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                    <span class="block w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 font-bold select-none cursor-default">Allowed</span>
                                 </td>
                                 <td class="p-2">
-                                    <button onclick="triggerScenario('restricted', 'a-reply-same')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                    <span class="block w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 font-bold select-none cursor-default">Allowed</span>
                                 </td>
                                 <td class="p-2">
-                                    <button onclick="triggerScenario('port-restricted', 'a-reply-same')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                    <span class="block w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 font-bold select-none cursor-default">Allowed</span>
                                 </td>
                                 <td class="p-2">
-                                    <button onclick="triggerScenario('symmetric', 'a-reply-same')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                    <span class="block w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 font-bold select-none cursor-default">Allowed</span>
                                 </td>
                             </tr>
 
                             <!-- Row 2: Known IP, new port -->
-                            <tr class="hover:bg-slate-800/40 transition">
+                            <tr class="hover:bg-slate-800/20 transition">
                                 <td class="p-3 text-left font-sans text-slate-200">
                                     <div class="font-bold">Known IP, new port</div>
                                     <div id="matrix-sub-known-diff" class="text-[10px] text-slate-400 font-mono font-normal">e.g., 8.8.8.8 from port 9999</div>
                                 </td>
                                 <td class="p-2">
-                                    <button onclick="triggerScenario('full-cone', 'a-reply-diff')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                    <span class="block w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 font-bold select-none cursor-default">Allowed</span>
                                 </td>
                                 <td class="p-2">
-                                    <button onclick="triggerScenario('restricted', 'a-reply-diff')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                    <span class="block w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 font-bold select-none cursor-default">Allowed</span>
                                 </td>
                                 <td class="p-2">
-                                    <button onclick="triggerScenario('port-restricted', 'a-reply-diff')" class="w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 matrix-cell-hover font-bold">Blocked</button>
+                                    <span class="block w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 font-bold select-none cursor-default">Blocked</span>
                                 </td>
                                 <td class="p-2">
-                                    <button onclick="triggerScenario('symmetric', 'a-reply-diff')" class="w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 matrix-cell-hover font-bold">Blocked</button>
+                                    <span class="block w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 font-bold select-none cursor-default">Blocked</span>
                                 </td>
                             </tr>
 
                             <!-- Row 3: Unknown IP -->
-                            <tr class="hover:bg-slate-800/40 transition">
+                            <tr class="hover:bg-slate-800/20 transition">
                                 <td class="p-3 text-left font-sans text-slate-200">
                                     <div class="font-bold">Unknown IP</div>
                                     <div class="text-[10px] text-slate-400 font-mono font-normal">Host C (198.51.100.99) unsolicited</div>
                                 </td>
                                 <td class="p-2">
-                                    <button onclick="triggerScenario('full-cone', 'unknown-inbound')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                    <span class="block w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 font-bold select-none cursor-default">Allowed</span>
                                 </td>
                                 <td class="p-2">
-                                    <button onclick="triggerScenario('restricted', 'unknown-inbound')" class="w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 matrix-cell-hover font-bold">Blocked</button>
+                                    <span class="block w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 font-bold select-none cursor-default">Blocked</span>
                                 </td>
                                 <td class="p-2">
-                                    <button onclick="triggerScenario('port-restricted', 'unknown-inbound')" class="w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 matrix-cell-hover font-bold">Blocked</button>
+                                    <span class="block w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 font-bold select-none cursor-default">Blocked</span>
                                 </td>
                                 <td class="p-2">
-                                    <button onclick="triggerScenario('symmetric', 'unknown-inbound')" class="w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 matrix-cell-hover font-bold">Blocked</button>
+                                    <span class="block w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 font-bold select-none cursor-default">Blocked</span>
                                 </td>
                             </tr>
 
                             <!-- Row 4: Peer sends to mapping -->
-                            <tr class="hover:bg-slate-800/40 transition">
+                            <tr class="hover:bg-slate-800/20 transition">
                                 <td class="p-3 text-left font-sans text-slate-200">
                                     <div id="matrix-title-peer-to-mapping" class="font-bold text-amber-200">B sends to A's mapping</div>
                                     <div id="matrix-sub-peer-to-mapping" class="text-[10px] text-slate-400 font-mono font-normal">Server B (1.1.1.1) to A's router port</div>
                                 </td>
                                 <td class="p-2">
-                                    <button onclick="triggerScenario('full-cone', 'b-to-a-mapping')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                    <span class="block w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 font-bold select-none cursor-default">Allowed</span>
                                 </td>
                                 <td class="p-2">
-                                    <button id="matrix-cell-restricted-peer" onclick="triggerScenario('restricted', 'b-to-a-mapping')" class="w-full py-2 px-3 rounded bg-amber-950/80 border border-amber-600/60 text-amber-300 matrix-cell-hover text-[11px] leading-tight">Only if you sent to B</button>
+                                    <span id="matrix-cell-restricted-peer" class="block w-full py-2 px-3 rounded bg-amber-950/80 border border-amber-600/60 text-amber-300 text-[11px] leading-tight select-none cursor-default">Only if you sent to B</span>
                                 </td>
                                 <td class="p-2">
-                                    <button id="matrix-cell-port-restricted-peer" onclick="triggerScenario('port-restricted', 'b-to-a-mapping')" class="w-full py-2 px-3 rounded bg-amber-950/80 border border-amber-600/60 text-amber-300 matrix-cell-hover text-[11px] leading-tight">Only if you sent to B</button>
+                                    <span id="matrix-cell-port-restricted-peer" class="block w-full py-2 px-3 rounded bg-amber-950/80 border border-amber-600/60 text-amber-300 text-[11px] leading-tight select-none cursor-default">Only if you sent to B</span>
                                 </td>
                                 <td class="p-2">
-                                    <button onclick="triggerScenario('symmetric', 'b-to-a-mapping')" class="w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 matrix-cell-hover font-bold">Blocked</button>
+                                    <span class="block w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 font-bold select-none cursor-default">Blocked</span>
                                 </td>
                             </tr>
                         </tbody>
@@ -562,7 +556,7 @@
                 </div>
             </div>
 
-            <!-- Key Takeaways Card (Exact diagram card) -->
+            <!-- Key Takeaways Card -->
             <div class="bg-gradient-to-r from-indigo-950/80 via-slate-900 to-indigo-950/80 rounded-xl p-5 border border-indigo-800/60 shadow-xl">
                 <h3 class="text-sm font-bold text-indigo-300 flex items-center gap-2 mb-3">
                     <i class="fa-solid fa-lightbulb text-amber-400 text-base"></i> Key Takeaways & Mental Model
@@ -796,6 +790,12 @@
             if (matrixSubPeerToMapping) {
                 matrixSubPeerToMapping.innerText = `Server ${otherLetter} (${otherNode.ip}) to ${knownLetter}'s router port`;
             }
+            if (matrixCellRestrictedPeer) {
+                matrixCellRestrictedPeer.innerText = `Only if you sent to ${otherLetter}`;
+            }
+            if (matrixCellPortRestrictedPeer) {
+                matrixCellPortRestrictedPeer.innerText = `Only if you sent to ${otherLetter}`;
+            }
         }
 
         // Resize Canvas dynamically with Retina / HiDPI support
@@ -835,7 +835,8 @@
         }
 
         window.addEventListener('resize', resizeCanvas);
-        // Canvas Direct Click Hit-Testing (Allows clicking Device or Server nodes directly on the canvas)
+
+        // Canvas Direct Click Hit-Testing
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -846,7 +847,6 @@
             }
 
             if (isInside(nodes.device, clickX, clickY)) {
-                // Clicking client device triggers primary outbound packet
                 if (firstContactedServer === 'serverB') {
                     document.getElementById('act-device-to-b').click();
                 } else {
@@ -858,7 +858,6 @@
                 } else if (!firstContactedServer) {
                     document.getElementById('act-device-to-a').click();
                 } else {
-                    // Server A is the secondary peer
                     document.getElementById('act-b-to-a-mapping').click();
                 }
             } else if (isInside(nodes.serverB, clickX, clickY)) {
@@ -867,7 +866,6 @@
                 } else if (!firstContactedServer) {
                     document.getElementById('act-device-to-b').click();
                 } else {
-                    // Server B is the secondary peer
                     document.getElementById('act-b-to-a-mapping').click();
                 }
             } else if (isInside(nodes.serverC, clickX, clickY)) {
@@ -877,7 +875,7 @@
             }
         });
 
-        // Show standard in-canvas activity toast (for NAT activation, speed, packet firewall events)
+        // Show standard in-canvas activity toast
         let canvasToastTimeout = null;
         function showCanvasToast(title, message, isAllowed = true) {
             if (!canvasToast) return;
@@ -913,7 +911,7 @@
 
             resetToast.classList.remove('hidden');
             resetToast.classList.remove('notify-slide-show');
-            void resetToast.offsetWidth; // Force reflow for keyframe animation
+            void resetToast.offsetWidth;
             resetToast.classList.add('notify-slide-show');
 
             resetToastTimeout = setTimeout(() => {
@@ -981,14 +979,13 @@
                 this.label = config.label || '';
                 this.color = config.color || '#10b981';
 
-                this.progress = 0; // 0 to 1
-                this.phase = 1;    // 1: from -> router, 2: router -> target
+                this.progress = 0;
+                this.phase = 1;
                 this.isBlocked = false;
                 this.dropAtRouter = false;
                 this.dropReason = '';
                 this.alive = true;
 
-                // Precompute firewall verdict
                 if (this.direction === 'inbound') {
                     const verdict = evaluateFirewallRule(this.fromIp, this.fromPort, this.targetPublicPort);
                     this.isBlocked = !verdict.allowed;
@@ -1002,20 +999,16 @@
 
                 if (this.phase === 1 && this.progress >= 1) {
                     if (this.direction === 'outbound') {
-                        // Router translates outbound packet
                         handleOutboundPacket(this.toIp, this.toPort, this.toNode.id);
                         this.phase = 2;
                         this.progress = 0;
                     } else {
-                        // Inbound arrives at router
                         if (this.isBlocked) {
-                            // Firewall rejects packet
                             spawnExplosion(this.midNode.x + this.midNode.w * 0.9, this.midNode.y + this.midNode.h * 0.5, '#ef4444');
                             this.alive = false;
                             showCanvasToast('Packet Dropped by Firewall', this.dropReason, false);
                             addLog('inbound', 'BLOCKED', `Inbound from ${this.fromIp}:${this.fromPort} dropped at port ${this.targetPublicPort}`, this.dropReason);
                         } else {
-                            // Firewall permits packet through
                             this.phase = 2;
                             this.progress = 0;
                             showCanvasToast('Inbound Packet Permitted', `Translated port ${this.targetPublicPort} → 192.168.1.5:5000`, true);
@@ -1023,7 +1016,6 @@
                         }
                     }
                 } else if (this.phase === 2 && this.progress >= 1) {
-                    // Packet completed its journey
                     this.alive = false;
                     spawnExplosion(
                         this.toNode.x + this.toNode.w / 2, 
@@ -1069,7 +1061,6 @@
                 const curX = startX + (endX - startX) * this.progress;
                 const curY = startY + (endY - startY) * this.progress;
 
-                // Draw glowing packet circle
                 ctx.save();
                 ctx.shadowColor = this.color;
                 ctx.shadowBlur = 12;
@@ -1084,7 +1075,6 @@
                 ctx.fill();
                 ctx.restore();
 
-                // Draw packet header label above circle
                 if (showPacketLabels && this.label) {
                     ctx.save();
                     ctx.font = '600 10px JetBrains Mono, monospace';
@@ -1205,7 +1195,6 @@
             const localPort = nodes.device.port;
             const publicIp = nodes.router.ip;
 
-            // Register first contacted server if not set
             if (!firstContactedServer) {
                 firstContactedServer = destNodeId;
                 updateDynamicKnownLabels();
@@ -1214,7 +1203,6 @@
             let binding = null;
 
             if (currentNat === 'symmetric') {
-                // Symmetric NAT: creates a separate public port for EACH unique remote destination
                 binding = natBindings.find(b => b.destIp === destIp && b.destPort === destPort);
                 if (!binding) {
                     const newPort = 40001 + natBindings.length;
@@ -1231,7 +1219,6 @@
                     natBindings.push(binding);
                 }
             } else {
-                // Cone NATs (Full Cone, Restricted, Port-Restricted): share the SAME public port (40001)
                 if (natBindings.length === 0) {
                     binding = {
                         localIp,
@@ -1335,7 +1322,7 @@
                 drawNode(node);
             });
 
-            // Draw Active Animated Packets (Delta scaled to 60fps standard)
+            // Draw Active Animated Packets
             for (let i = packets.length - 1; i >= 0; i--) {
                 const p = packets[i];
                 p.update(1);
@@ -1388,7 +1375,6 @@
             ctx.lineTo(endX, endY);
             ctx.stroke();
 
-            // Arrowhead at center
             const midX = (startX + endX) / 2;
             const midY = (startY + endY) / 2;
             const angle = Math.atan2(endY - startY, endX - startX);
@@ -1408,7 +1394,6 @@
         // Draw Network Box Node
         function drawNode(node) {
             ctx.save();
-            // Background Box with rounded corners
             ctx.fillStyle = node.color;
             ctx.strokeStyle = node.border;
             ctx.lineWidth = 2;
@@ -1417,7 +1402,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Title
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 12px Inter, sans-serif';
             ctx.textAlign = 'center';
@@ -1432,7 +1416,6 @@
             }
             ctx.fillText(displayTitle, node.x + node.w / 2, node.y + 24);
 
-            // Subtitle / Address info
             ctx.font = '11px JetBrains Mono, monospace';
             if (node.id === 'router') {
                 const portDisplay = natBindings.length > 0 
@@ -1455,7 +1438,6 @@
         function setNatType(natType) {
             currentNat = natType;
 
-            // Reset ribbon buttons styling
             const buttons = {
                 'full-cone': document.getElementById('btn-nat-full-cone'),
                 'restricted': document.getElementById('btn-nat-restricted'),
@@ -1490,7 +1472,6 @@
             if (natBadgeFilter) natBadgeFilter.innerText = filters[natType];
             if (canvasStatusPill) canvasStatusPill.innerText = `NAT: ${titles[natType].split('(')[0]}`;
 
-            // Reset router state table on NAT architecture switch to reflect real-world conntrack flush
             natBindings = [];
             packets = [];
             firstContactedServer = null;
@@ -1500,7 +1481,6 @@
             addLog('outbound', 'TRANSLATED', `NAT architecture changed to: ${titles[natType]}`, 'State flushed: Auto-seeding initial outbound flow to Server A');
             showCanvasToast(`${titles[natType].split('(')[0].trim()} Activated`, 'State flushed. Sending initial Device → Server A packet...', true);
 
-            // Automatically emit Device -> Server A to establish initial mapping for the new NAT type
             setTimeout(() => {
                 const btnA = document.getElementById('act-device-to-a');
                 if (btnA) btnA.click();
@@ -1513,7 +1493,7 @@
         document.getElementById('btn-nat-port-restricted').addEventListener('click', () => setNatType('port-restricted'));
         document.getElementById('btn-nat-symmetric').addEventListener('click', () => setNatType('symmetric'));
 
-        // Speed Multiplier Buttons (0.3x, 0.5x, 1x, 2x)
+        // Speed Multiplier Buttons
         document.querySelectorAll('.speed-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.speed-btn').forEach(b => {
@@ -1655,33 +1635,6 @@
             }));
         });
 
-        // Trigger matrix cell shortcut
-        window.triggerScenario = function(natMode, scenario) {
-            setNatType(natMode);
-            
-            // Respect who is currently contacted or default to server A
-            const targetFirstServerKey = firstContactedServer || 'serverA';
-            const targetFirstServerNode = nodes[targetFirstServerKey];
-
-            const hasContacted = natBindings.some(b => b.destIp === targetFirstServerNode.ip);
-            if (!hasContacted) {
-                firstContactedServer = targetFirstServerKey;
-                handleOutboundPacket(targetFirstServerNode.ip, targetFirstServerNode.port, targetFirstServerKey);
-                updateDynamicKnownLabels();
-                addLog('outbound', 'TRANSLATED', `Pre-established outbound flow to ${targetFirstServerNode.title} (${targetFirstServerNode.ip}:${targetFirstServerNode.port})`, 'Initial Setup');
-            }
-
-            if (scenario === 'a-reply-same') {
-                document.getElementById('act-a-reply-same').click();
-            } else if (scenario === 'a-reply-diff') {
-                document.getElementById('act-a-reply-diff').click();
-            } else if (scenario === 'unknown-inbound') {
-                document.getElementById('act-unknown-inbound').click();
-            } else if (scenario === 'b-to-a-mapping') {
-                document.getElementById('act-b-to-a-mapping').click();
-            }
-        };
-
         // Reset Router State
         document.getElementById('btn-reset-simulation').addEventListener('click', () => {
             natBindings = [];
@@ -1725,8 +1678,8 @@
                 targetId: "tour-step-tables"
             },
             {
-                title: "4. Interactive Comparison Matrix",
-                body: "Every single cell in the 'Who can send inbound traffic?' table is clickable! Click any cell to automatically test that exact combination on the network canvas.",
+                title: "4. Architecture Comparison Matrix",
+                body: "Review the 'Who can send inbound traffic?' reference table to easily compare and verify firewall drop/allow rules across all 4 architectures.",
                 targetId: "tour-step-matrix"
             }
         ];
@@ -1779,9 +1732,8 @@
             }
         });
 
-        // Animation Loop with delta time safeguard
-        let lastTime = 0;
-        function animate(timestamp) {
+        // Animation Loop
+        function animate() {
             drawCanvas();
             requestAnimationFrame(animate);
         }
