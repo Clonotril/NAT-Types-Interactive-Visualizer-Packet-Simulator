@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAT Types Interactive Visualizer & Packet Simulator</title>
+    
+    <!-- SEO & Social OpenGraph Meta Tags (Optimal for LinkedIn, Twitter, & GitHub Previews) -->
+    <meta name="description" content="An interactive, real-time packet simulator comparing Full Cone, Restricted, Port-Restricted, and Symmetric NAT behaviors (RFC 3489 / RFC 4787).">
+    <meta name="keywords" content="NAT, Network Address Translation, STUN, TURN, WebRTC, P2P Hole Punching, Networking, Interactive Simulator">
+    <meta name="author" content="Interactive NAT Visualizer">
+    <meta property="og:title" content="NAT Types Interactive Visualizer & Packet Simulator">
+    <meta property="og:description" content="Visualizing NAT mapping & inbound firewall filtering logic in real-time with packet flight, state tables, and interactive matrices.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19;
+            color: #f1f5f9;
+        }
+        pre, code, .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        /* Canvas glowing border */
+        .canvas-container {
+            position: relative;
+            box-shadow: 0 0 35px -5px rgba(16, 185, 129, 0.08), inset 0 0 20px rgba(0, 0, 0, 0.7);
+        }
+        .matrix-cell-hover:hover {
+            transform: scale(1.02);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.15);
+            cursor: pointer;
+        }
+        /* Top-right reset alert notification animation */
+        @keyframes notifySlideInRight {
+            0% {
+                transform: translateX(110%);
+                opacity: 0;
+            }
+            70% {
+                transform: translateX(-4px);
+                opacity: 1;
+            }
+            100% {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        .notify-slide-show {
+            animation: notifySlideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-slate-950">
+
+    <!-- Top-Right Floating Notification Specifically for Router State Reset -->
+    <div id="reset-toast-container" class="fixed top-4 right-4 z-50 pointer-events-none flex flex-col items-end">
+        <div id="reset-toast" class="pointer-events-auto hidden max-w-sm w-80 sm:w-96 rounded-xl border border-rose-500/50 bg-slate-900/95 backdrop-blur-md p-4 shadow-[0_12px_40px_rgba(244,63,94,0.25)] transition-all duration-300">
+            <div class="flex items-start gap-3">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-base bg-rose-500/20 text-rose-400 border border-rose-500/40">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="font-bold text-xs text-white">Router State Reset</span>
+                            <span class="font-mono text-[9px] px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800/80 shrink-0">FLUSHED</span>
+                        </div>
+                        <button id="btn-reset-toast-close" class="text-slate-400 hover:text-white text-xs p-1 rounded hover:bg-slate-800 transition">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <p id="reset-toast-msg" class="text-slate-300 text-[11px] mt-1 leading-snug">All translation bindings, sessions, and packets have been flushed.</p>
+                    <div class="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-800 text-[10px] text-slate-500">
+                        <span class="flex items-center gap-1.5 text-rose-400/90 font-medium"><i class="fa-solid fa-shield-halved"></i> Conntrack Table Cleared</span>
+                        <span id="reset-toast-time" class="font-mono text-slate-400">just now</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Header -->
+    <header class="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur sticky top-0 z-30 px-4 py-3 sm:px-6">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-lg shadow-sm">
+                    <i class="fa-solid fa-network-wired"></i>
+                </div>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                        NAT Types Interactive Visualizer
+                        <span class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">RFC 3489 / 4787</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Side-by-side comparison & live animated packet firewall simulation</p>
+                </div>
+            </div>
+
+            <!-- Global Action Bar -->
+            <div class="flex items-center flex-wrap gap-2">
+                <button id="btn-quick-tour" class="text-xs font-semibold px-3 py-1.5 rounded-md bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/50 border border-indigo-500/40 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-graduation-cap text-indigo-400"></i> Quick Tour
+                </button>
+                <button id="btn-reset-simulation" class="text-xs font-semibold px-3 py-1.5 rounded-md bg-rose-600/20 hover:bg-rose-600/35 text-rose-300 border border-rose-500/50 hover:border-rose-400 transition shadow-sm flex items-center gap-1.5 group">
+                    <i class="fa-solid fa-rotate-right text-rose-400 group-hover:rotate-180 transition-transform duration-300"></i> Reset Router State
+                </button>
+                
+                <!-- Speed Selector with 0.3x, 0.5x, 1x, 2x -->
+                <div class="flex items-center bg-slate-800/80 border border-slate-700 rounded-md p-0.5 text-xs">
+                    <span class="text-[10px] text-slate-400 px-2 font-mono"><i class="fa-solid fa-gauge-high"></i> Speed:</span>
+                    <button data-speed="0.3" class="speed-btn px-1.5 py-0.5 rounded text-[11px] text-slate-400 hover:text-white transition">0.3x</button>
+                    <button data-speed="0.5" class="speed-btn px-1.5 py-0.5 rounded text-[11px] bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 transition">0.5x</button>
+                    <button data-speed="1.0" class="speed-btn px-1.5 py-0.5 rounded text-[11px] text-slate-400 hover:text-white transition">1x</button>
+                    <button data-speed="2.0" class="speed-btn px-1.5 py-0.5 rounded text-[11px] text-slate-400 hover:text-white transition">2x</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Collapsible Quick Step Tutorial Banner -->
+    <div id="guide-banner" class="bg-slate-900/60 border-b border-slate-800 text-xs px-4 py-2.5 sm:px-6">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-2 text-slate-300">
+                <i class="fa-solid fa-circle-info text-emerald-400"></i>
+                <span><strong class="text-white">How it works:</strong> 1. Pick a NAT type &rarr; 2. Send outbound to create router mapping &rarr; 3. Test inbound replies from Server A, B, or C &rarr; 4. Observe firewall allow/block logic.</span>
+            </div>
+            <button id="btn-toggle-guide" class="text-[11px] text-slate-400 hover:text-slate-200 underline">Dismiss</button>
+        </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+
+        <!-- NAT Type Selection Ribbon (Matches Diagram) -->
+        <section id="tour-step-nat-ribbon" class="bg-slate-900/90 rounded-xl p-4 border border-slate-800 shadow-lg">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Select NAT Architecture:</span>
+                    <span class="text-[11px] text-slate-500">Left to right: More open &rarr; More strict</span>
+                </div>
+                <div class="text-xs font-mono text-emerald-400 flex items-center gap-1.5">
+                    <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span id="active-nat-title" class="font-bold">Full Cone NAT</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <!-- 1. Full Cone -->
+                <button id="btn-nat-full-cone" class="nat-type-btn p-3 rounded-lg border-2 border-emerald-500/80 bg-emerald-950/40 text-left transition hover:border-emerald-400 flex flex-col justify-between group">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-bold text-emerald-200 group-hover:text-emerald-100">Full Cone</span>
+                        <i class="fa-solid fa-check-circle text-emerald-400"></i>
+                    </div>
+                    <div class="text-xs font-semibold text-emerald-400/90 mt-1">no filter</div>
+                    <div class="text-[10px] text-slate-400 mt-2 leading-relaxed">Single public port mapping. Any external host can send packets to this mapped port once opened.</div>
+                </button>
+
+                <!-- 2. Restricted (IP) -->
+                <button id="btn-nat-restricted" class="nat-type-btn p-3 rounded-lg border border-slate-700 bg-slate-800/60 text-left transition hover:border-cyan-500/80 flex flex-col justify-between group">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-bold text-cyan-200 group-hover:text-cyan-100">Restricted</span>
+                        <i class="fa-solid fa-filter text-cyan-400"></i>
+                    </div>
+                    <div class="text-xs font-semibold text-cyan-400/90 mt-1">filters by IP</div>
+                    <div class="text-[10px] text-slate-400 mt-2 leading-relaxed">Same port mapping. Inbound allowed ONLY from external IP addresses that the internal client contacted.</div>
+                </button>
+
+                <!-- 3. Port-Restricted -->
+                <button id="btn-nat-port-restricted" class="nat-type-btn p-3 rounded-lg border border-slate-700 bg-slate-800/60 text-left transition hover:border-indigo-500/80 flex flex-col justify-between group">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-bold text-indigo-200 group-hover:text-indigo-100">Port-restricted</span>
+                        <i class="fa-solid fa-shield-halved text-indigo-400"></i>
+                    </div>
+                    <div class="text-xs font-semibold text-indigo-400/90 mt-1">IP and port</div>
+                    <div class="text-[10px] text-slate-400 mt-2 leading-relaxed">Same port mapping. Inbound allowed ONLY if client previously sent to that EXACT external IP & port.</div>
+                </button>
+
+                <!-- 4. Symmetric -->
+                <button id="btn-nat-symmetric" class="nat-type-btn p-3 rounded-lg border border-slate-700 bg-slate-800/60 text-left transition hover:border-rose-500/80 flex flex-col justify-between group">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-bold text-rose-200 group-hover:text-rose-100">Symmetric</span>
+                        <i class="fa-solid fa-lock text-rose-400"></i>
+                    </div>
+                    <div class="text-xs font-semibold text-rose-400/90 mt-1">new port each</div>
+                    <div class="text-[10px] text-slate-400 mt-2 leading-relaxed">Assigns a unique public port for EVERY remote destination. Only that specific server/port can respond.</div>
+                </button>
+            </div>
+
+            <!-- Dynamic Live Action Trigger Panel -->
+            <div id="tour-step-triggers" class="mt-4 pt-3 border-t border-slate-800/80">
+                <div class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <span>Inject Packet Triggers:</span>
+                    <span id="known-ip-indicator" class="text-[11px] text-indigo-400 font-mono">Known IP: None (send outbound packet first)</span>
+                </div>
+                
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                    <!-- Action 1 -->
+                    <button id="act-device-to-a" class="action-btn p-2.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-left transition flex flex-col justify-between group">
+                        <div class="text-[10px] text-emerald-400 font-mono font-bold flex items-center gap-1">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> OUTBOUND
+                        </div>
+                        <span class="text-xs font-semibold text-slate-200 group-hover:text-white mt-1">Device &rarr; Server A</span>
+                        <span class="text-[10px] text-slate-400 font-mono">192.168.1.5 &rarr; 8.8.8.8:80</span>
+                    </button>
+
+                    <!-- Action 2 -->
+                    <button id="act-device-to-b" class="action-btn p-2.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-left transition flex flex-col justify-between group">
+                        <div class="text-[10px] text-amber-400 font-mono font-bold flex items-center gap-1">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> OUTBOUND
+                        </div>
+                        <span class="text-xs font-semibold text-slate-200 group-hover:text-white mt-1">Device &rarr; Server B</span>
+                        <span class="text-[10px] text-slate-400 font-mono">192.168.1.5 &rarr; 1.1.1.1:80</span>
+                    </button>
+
+                    <!-- Action 3: Dynamic Known IP, Same Port -->
+                    <button id="act-a-reply-same" class="action-btn p-2.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-left transition flex flex-col justify-between group">
+                        <div class="text-[10px] text-cyan-400 font-mono font-bold flex items-center gap-1">
+                            <i class="fa-solid fa-arrow-down-left-and-up-right-to-center"></i> INBOUND
+                        </div>
+                        <span id="label-known-same-port" class="text-xs font-semibold text-slate-200 group-hover:text-white mt-1">Known IP (Same Port)</span>
+                        <span id="sub-known-same-port" class="text-[10px] text-slate-400 font-mono">Known IP, port 80</span>
+                    </button>
+
+                    <!-- Action 4: Dynamic Known IP, New Port -->
+                    <button id="act-a-reply-diff" class="action-btn p-2.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-left transition flex flex-col justify-between group">
+                        <div class="text-[10px] text-amber-400 font-mono font-bold flex items-center gap-1">
+                            <i class="fa-solid fa-shuffle"></i> INBOUND
+                        </div>
+                        <span id="label-known-new-port" class="text-xs font-semibold text-slate-200 group-hover:text-white mt-1">Known IP (New Port)</span>
+                        <span id="sub-known-new-port" class="text-[10px] text-slate-400 font-mono">Known IP, port 9999</span>
+                    </button>
+
+                    <!-- Action 5: Unknown IP (Host C) -->
+                    <button id="act-unknown-inbound" class="action-btn p-2.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-left transition flex flex-col justify-between group">
+                        <div class="text-[10px] text-purple-400 font-mono font-bold flex items-center gap-1">
+                            <i class="fa-solid fa-user-secret"></i> INBOUND
+                        </div>
+                        <span class="text-xs font-semibold text-slate-200 group-hover:text-white mt-1">Unknown IP (Host C)</span>
+                        <span class="text-[10px] text-slate-400 font-mono">Never contacted before</span>
+                    </button>
+
+                    <!-- Action 6: Other peer sends to mapping -->
+                    <button id="act-b-to-a-mapping" class="action-btn p-2.5 rounded-lg bg-amber-950/40 hover:bg-amber-900/50 border border-amber-800/70 text-left transition flex flex-col justify-between group">
+                        <div class="text-[10px] text-amber-300 font-mono font-bold flex items-center gap-1">
+                            <i class="fa-solid fa-triangle-exclamation"></i> CRUCIAL TEST
+                        </div>
+                        <span id="label-peer-to-mapping" class="text-xs font-semibold text-amber-200 group-hover:text-amber-100 mt-1">Peer &rarr; Active Mapping</span>
+                        <span id="sub-peer-to-mapping" class="text-[10px] text-amber-300/80 font-mono">Key P2P question!</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Live Network Canvas Visualizer -->
+        <section class="bg-slate-900/90 rounded-xl p-4 border border-slate-800 shadow-xl">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-nodes text-emerald-400"></i> Network Topology & Packet Flight:
+                    </span>
+                    <span id="canvas-status-pill" class="text-[11px] px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">
+                        NAT: Full Cone
+                    </span>
+                </div>
+                <div class="flex items-center gap-4 text-xs text-slate-400">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" id="chk-packet-labels" checked class="rounded border-slate-700 text-emerald-500 focus:ring-0">
+                        <span>Show Packet Headers</span>
+                    </label>
+                    <span class="text-slate-500 text-[11px]">Click nodes/buttons to emit packets</span>
+                </div>
+            </div>
+
+            <!-- Canvas Container -->
+            <div class="canvas-container rounded-lg bg-slate-950 border border-slate-800 overflow-hidden relative" style="height: 380px;">
+                <canvas id="networkCanvas" class="w-full h-full block cursor-pointer select-none touch-none"></canvas>
+
+                <!-- In-Canvas General Status & Activity Toast -->
+                <div id="canvas-toast" class="absolute bottom-3 left-1/2 -translate-x-1/2 hidden z-10 px-4 py-2 rounded-lg bg-slate-900/95 backdrop-blur-md border border-slate-700/80 text-xs shadow-2xl flex items-center gap-2.5 max-w-[90%] sm:max-w-md pointer-events-none transition-all duration-200">
+                    <span id="canvas-toast-icon" class="text-emerald-400 shrink-0 text-sm">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </span>
+                    <div class="min-w-0">
+                        <div id="canvas-toast-title" class="font-bold text-white text-[11px] truncate">Activated</div>
+                        <div id="canvas-toast-msg" class="text-slate-300 text-[10px] leading-tight truncate">Notification text</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Router Binding Table & Realtime Decision Log -->
+        <div id="tour-step-tables" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- NAT Router State Table -->
+            <section class="lg:col-span-7 bg-slate-900/90 rounded-xl p-4 border border-slate-800 shadow-lg">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2.5 h-2.5 rounded-full bg-indigo-500"></div>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Active Router Translation Table (State Table)</h2>
+                    </div>
+                    <span id="nat-badge-filter" class="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                        Filter: None
+                    </span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="bg-slate-950/70 text-slate-400 border-b border-slate-800 text-[11px]">
+                            <tr>
+                                <th class="p-2">Local Endpoint</th>
+                                <th class="p-2">Public Mapped</th>
+                                <th class="p-2">Remote Dest</th>
+                                <th class="p-2">Allowed Inbound Senders</th>
+                                <th class="p-2 text-right">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="nat-table-body" class="divide-y divide-slate-800/60 text-slate-300">
+                            <tr>
+                                <td colspan="5" class="p-4 text-center text-slate-500 font-sans italic text-xs">
+                                    No active mappings yet. Click <span class="text-emerald-400 font-mono font-semibold">Device &rarr; Server A</span> or <span class="text-amber-400 font-mono font-semibold">Device &rarr; Server B</span> to open a session!
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3 text-[11px] text-slate-400 border-t border-slate-800/80 pt-2 flex items-center justify-between">
+                    <span>* Symmetric creates a new public port for each new remote destination IP/Port.</span>
+                    <span class="text-slate-500">Router IP: 203.0.113.7</span>
+                </div>
+            </section>
+
+            <!-- Live Firewall Event Log -->
+            <section class="lg:col-span-5 bg-slate-900/90 rounded-xl p-4 border border-slate-800 shadow-lg flex flex-col h-[280px]">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Firewall Decision & Packet Log</h2>
+                    </div>
+                    <button id="btn-clear-log" class="text-[11px] text-slate-400 hover:text-white transition">Clear</button>
+                </div>
+
+                <div id="packet-log" class="flex-1 overflow-y-auto space-y-2 pr-1 font-mono text-[11px]">
+                    <div class="p-2 rounded bg-slate-950/60 border border-slate-800 text-slate-400">
+                        [System] Simulation initialized. Select a NAT type and inject packets to inspect firewall rules.
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Comparative Matrices (Matches Diagram Exactly) -->
+        <section id="tour-step-matrix" class="space-y-6">
+            <!-- 1. "Who can send inbound traffic?" Matrix -->
+            <div class="bg-slate-900/90 rounded-xl p-4 sm:p-5 border border-slate-800 shadow-xl">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div>
+                        <h2 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-table-cells text-emerald-400"></i> Who can send inbound traffic?
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Click any interactive cell below to automatically test that exact condition on the live canvas!</p>
+                    </div>
+                    <!-- Prominent Highlight Badge for Architecture Role Definition -->
+                    <div id="matrix-role-badge" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 via-amber-400/10 to-amber-500/20 border-2 border-amber-400/60 shadow-[0_0_15px_rgba(245,158,11,0.15)] text-xs font-mono">
+                        <i class="fa-solid fa-circle-question text-amber-400 text-sm animate-pulse"></i>
+                        <span id="matrix-role-text">
+                            <strong class="text-amber-300 font-bold tracking-wide">A</strong> <span class="text-slate-200">= Server contacted first</span>
+                            <span class="text-amber-500/80 mx-1.5">|</span>
+                            <strong class="text-amber-300 font-bold tracking-wide">B</strong> <span class="text-slate-200">= Different server</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-center text-xs border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-700 bg-slate-950/60 font-semibold text-slate-300">
+                                <th class="p-3 text-left w-1/4">Sender</th>
+                                <th class="p-3 w-1/5 text-emerald-400">Full cone</th>
+                                <th class="p-3 w-1/5 text-cyan-400">Restricted</th>
+                                <th class="p-3 w-1/5 text-indigo-400">Port-restr.</th>
+                                <th class="p-3 w-1/5 text-rose-400">Symmetric</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800 text-xs font-semibold">
+                            <!-- Row 1: Known IP, same port -->
+                            <tr class="hover:bg-slate-800/40 transition">
+                                <td class="p-3 text-left font-sans text-slate-200">
+                                    <div class="font-bold">Known IP, same port</div>
+                                    <div id="matrix-sub-known-same" class="text-[10px] text-slate-400 font-mono font-normal">e.g., 8.8.8.8:80 replying</div>
+                                </td>
+                                <td class="p-2">
+                                    <button onclick="triggerScenario('full-cone', 'a-reply-same')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                </td>
+                                <td class="p-2">
+                                    <button onclick="triggerScenario('restricted', 'a-reply-same')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                </td>
+                                <td class="p-2">
+                                    <button onclick="triggerScenario('port-restricted', 'a-reply-same')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                </td>
+                                <td class="p-2">
+                                    <button onclick="triggerScenario('symmetric', 'a-reply-same')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                </td>
+                            </tr>
+
+                            <!-- Row 2: Known IP, new port -->
+                            <tr class="hover:bg-slate-800/40 transition">
+                                <td class="p-3 text-left font-sans text-slate-200">
+                                    <div class="font-bold">Known IP, new port</div>
+                                    <div id="matrix-sub-known-diff" class="text-[10px] text-slate-400 font-mono font-normal">e.g., 8.8.8.8 from port 9999</div>
+                                </td>
+                                <td class="p-2">
+                                    <button onclick="triggerScenario('full-cone', 'a-reply-diff')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                </td>
+                                <td class="p-2">
+                                    <button onclick="triggerScenario('restricted', 'a-reply-diff')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                </td>
+                                <td class="p-2">
+                                    <button onclick="triggerScenario('port-restricted', 'a-reply-diff')" class="w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 matrix-cell-hover font-bold">Blocked</button>
+                                </td>
+                                <td class="p-2">
+                                    <button onclick="triggerScenario('symmetric', 'a-reply-diff')" class="w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 matrix-cell-hover font-bold">Blocked</button>
+                                </td>
+                            </tr>
+
+                            <!-- Row 3: Unknown IP -->
+                            <tr class="hover:bg-slate-800/40 transition">
+                                <td class="p-3 text-left font-sans text-slate-200">
+                                    <div class="font-bold">Unknown IP</div>
+                                    <div class="text-[10px] text-slate-400 font-mono font-normal">Host C (198.51.100.99) unsolicited</div>
+                                </td>
+                                <td class="p-2">
+                                    <button onclick="triggerScenario('full-cone', 'unknown-inbound')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                </td>
+                                <td class="p-2">
+                                    <button onclick="triggerScenario('restricted', 'unknown-inbound')" class="w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 matrix-cell-hover font-bold">Blocked</button>
+                                </td>
+                                <td class="p-2">
+                                    <button onclick="triggerScenario('port-restricted', 'unknown-inbound')" class="w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 matrix-cell-hover font-bold">Blocked</button>
+                                </td>
+                                <td class="p-2">
+                                    <button onclick="triggerScenario('symmetric', 'unknown-inbound')" class="w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 matrix-cell-hover font-bold">Blocked</button>
+                                </td>
+                            </tr>
+
+                            <!-- Row 4: Peer sends to mapping -->
+                            <tr class="hover:bg-slate-800/40 transition">
+                                <td class="p-3 text-left font-sans text-slate-200">
+                                    <div id="matrix-title-peer-to-mapping" class="font-bold text-amber-200">B sends to A's mapping</div>
+                                    <div id="matrix-sub-peer-to-mapping" class="text-[10px] text-slate-400 font-mono font-normal">Server B (1.1.1.1) to A's router port</div>
+                                </td>
+                                <td class="p-2">
+                                    <button onclick="triggerScenario('full-cone', 'b-to-a-mapping')" class="w-full py-2 px-3 rounded bg-emerald-950/70 border border-emerald-500/60 text-emerald-300 matrix-cell-hover font-bold">Allowed</button>
+                                </td>
+                                <td class="p-2">
+                                    <button id="matrix-cell-restricted-peer" onclick="triggerScenario('restricted', 'b-to-a-mapping')" class="w-full py-2 px-3 rounded bg-amber-950/80 border border-amber-600/60 text-amber-300 matrix-cell-hover text-[11px] leading-tight">Only if you sent to B</button>
+                                </td>
+                                <td class="p-2">
+                                    <button id="matrix-cell-port-restricted-peer" onclick="triggerScenario('port-restricted', 'b-to-a-mapping')" class="w-full py-2 px-3 rounded bg-amber-950/80 border border-amber-600/60 text-amber-300 matrix-cell-hover text-[11px] leading-tight">Only if you sent to B</button>
+                                </td>
+                                <td class="p-2">
+                                    <button onclick="triggerScenario('symmetric', 'b-to-a-mapping')" class="w-full py-2 px-3 rounded bg-rose-950/70 border border-rose-600/60 text-rose-300 matrix-cell-hover font-bold">Blocked</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 2. Side by side Feature Comparison Matrix -->
+            <div class="bg-slate-900/90 rounded-xl p-4 sm:p-5 border border-slate-800 shadow-xl">
+                <h2 class="text-sm sm:text-base font-bold text-white mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-cyan-400"></i> Side by Side Architectural Properties
+                </h2>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-center text-xs border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-700 bg-slate-950/60 font-semibold text-slate-300">
+                                <th class="p-3 text-left w-1/4">Property</th>
+                                <th class="p-3 w-1/5 text-emerald-400">Full cone</th>
+                                <th class="p-3 w-1/5 text-cyan-400">Restricted</th>
+                                <th class="p-3 w-1/5 text-indigo-400">Port-restr.</th>
+                                <th class="p-3 w-1/5 text-rose-400">Symmetric</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800 text-xs">
+                            <tr class="hover:bg-slate-800/30">
+                                <td class="p-3 text-left font-bold text-slate-200">Mapping Behavior</td>
+                                <td class="p-3 text-slate-300">Same for all</td>
+                                <td class="p-3 text-slate-300">Same for all</td>
+                                <td class="p-3 text-slate-300">Same for all</td>
+                                <td class="p-3 text-rose-300 font-semibold">Per server (unique port)</td>
+                            </tr>
+                            <tr class="hover:bg-slate-800/30">
+                                <td class="p-3 text-left font-bold text-slate-200">Filters By</td>
+                                <td class="p-3 text-emerald-400 font-semibold">Nothing</td>
+                                <td class="p-3 text-cyan-400">Sender IP</td>
+                                <td class="p-3 text-indigo-400">IP and port</td>
+                                <td class="p-3 text-rose-400 font-semibold">Exact server session</td>
+                            </tr>
+                            <tr class="hover:bg-slate-800/30">
+                                <td class="p-3 text-left font-bold text-slate-200">Must Send First To</td>
+                                <td class="p-3 text-emerald-400">Nobody</td>
+                                <td class="p-3 text-slate-300">Peer IP</td>
+                                <td class="p-3 text-slate-300">Peer IP:port</td>
+                                <td class="p-3 text-slate-300">Peer IP:port</td>
+                            </tr>
+                            <tr class="hover:bg-slate-800/30">
+                                <td class="p-3 text-left font-bold text-slate-200">Peer Changes Port</td>
+                                <td class="p-3 text-emerald-300">Still passes</td>
+                                <td class="p-3 text-emerald-300">Still passes</td>
+                                <td class="p-3 text-rose-400 font-semibold">Dropped</td>
+                                <td class="p-3 text-rose-400 font-semibold">Dropped</td>
+                            </tr>
+                            <tr class="hover:bg-slate-800/30">
+                                <td class="p-3 text-left font-bold text-slate-200">Security Level</td>
+                                <td class="p-3 text-amber-400">Lowest</td>
+                                <td class="p-3 text-slate-300">Medium</td>
+                                <td class="p-3 text-cyan-300">Higher</td>
+                                <td class="p-3 text-emerald-400 font-bold">Highest</td>
+                            </tr>
+                            <tr class="hover:bg-slate-800/30">
+                                <td class="p-3 text-left font-bold text-slate-200">P2P Hole Punching</td>
+                                <td class="p-3 text-emerald-400 font-bold">Easiest</td>
+                                <td class="p-3 text-emerald-300">Usually works</td>
+                                <td class="p-3 text-amber-300">Stricter (needs matching ports)</td>
+                                <td class="p-3 text-rose-400 font-bold">Usually fails</td>
+                            </tr>
+                            <tr class="hover:bg-slate-800/30">
+                                <td class="p-3 text-left font-bold text-slate-200">Needs TURN Relay</td>
+                                <td class="p-3 text-slate-400">No</td>
+                                <td class="p-3 text-slate-400">No</td>
+                                <td class="p-3 text-amber-400">Rarely</td>
+                                <td class="p-3 text-rose-400 font-bold">Often (Required for P2P)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Key Takeaways Card (Exact diagram card) -->
+            <div class="bg-gradient-to-r from-indigo-950/80 via-slate-900 to-indigo-950/80 rounded-xl p-5 border border-indigo-800/60 shadow-xl">
+                <h3 class="text-sm font-bold text-indigo-300 flex items-center gap-2 mb-3">
+                    <i class="fa-solid fa-lightbulb text-amber-400 text-base"></i> Key Takeaways & Mental Model
+                </h3>
+                <ul class="space-y-2 text-xs text-slate-300 leading-relaxed">
+                    <li class="flex items-start gap-2">
+                        <span class="text-indigo-400 font-bold">•</span>
+                        <span><strong>A = server you contacted, B = another server reaching you:</strong> Can B reach you through A's port? In Full Cone: Yes. In Restricted/Port-Restricted: Only if you already sent a packet to B. In Symmetric: Never!</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-indigo-400 font-bold">•</span>
+                        <span><strong>Cone types reuse one mapping; symmetric makes one per server:</strong> Full cone, restricted, and port-restricted are called "cones" because outbound packets to different destinations share the same public port mapping on the NAT router. Symmetric creates a distinct public port for each remote peer.</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-indigo-400 font-bold">•</span>
+                        <span><strong>Stricter filtering is safer but harder for P2P:</strong> WebRTC, VoIP (SIP), and multiplayer gaming prefer Cone NATs because STUN hole punching succeeds easily without expensive TURN relay servers.</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-indigo-400 font-bold">•</span>
+                        <span><strong>Full cone is easiest; port-restricted is the safest cone type:</strong> Full Cone accepts unsolicited packets from strangers; Port-Restricted prevents spoofing by checking both remote IP and port numbers.</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-indigo-400 font-bold">•</span>
+                        <span><strong>Symmetric: only the exact server can reply:</strong> Since Server B cannot know the randomized port NAT assigned for Server A, symmetric hole punching fails and traffic must be relayed via TURN.</span>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Guided Tour Modal -->
+    <div id="tour-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl max-w-lg w-full p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                    <i class="fa-solid fa-compass"></i>
+                    <span id="tour-step-title">Interactive Quick Tour (1/4)</span>
+                </div>
+                <button id="btn-close-modal" class="text-slate-400 hover:text-white text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="tour-step-body" class="text-xs text-slate-300 leading-relaxed space-y-2">
+                <!-- Injected via JS -->
+            </div>
+            <div class="flex items-center justify-between border-t border-slate-800 pt-3">
+                <button id="btn-tour-prev" class="text-xs px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40">Previous</button>
+                <div class="flex gap-1" id="tour-dots"></div>
+                <button id="btn-tour-next" class="text-xs px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 font-semibold text-white">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Global Simulation State
+        let currentNat = 'full-cone'; // 'full-cone' | 'restricted' | 'port-restricted' | 'symmetric'
+        let animSpeedMultiplier = 0.5; // Default speed set to 0.5x
+        let showPacketLabels = true;
+        let firstContactedServer = null; // 'serverA' | 'serverB' | null
+
+        // Router Mapping Table State
+        // Each entry: { localIp, localPort, publicIp, publicPort, destIp, destPort, allowedList: [] }
+        let natBindings = [];
+
+        // Network Topology Nodes
+        const nodes = {
+            device: {
+                id: 'device',
+                title: 'Device (Client)',
+                ip: '192.168.1.5',
+                port: 5000,
+                x: 0, y: 0, w: 140, h: 70,
+                color: '#1e293b',
+                border: '#475569',
+                icon: 'fa-laptop'
+            },
+            router: {
+                id: 'router',
+                title: 'NAT Router',
+                ip: '203.0.113.7',
+                port: 40001,
+                x: 0, y: 0, w: 150, h: 75,
+                color: '#312e81',
+                border: '#6366f1',
+                icon: 'fa-shield-halved'
+            },
+            serverA: {
+                id: 'serverA',
+                title: 'Server A',
+                ip: '8.8.8.8',
+                port: 80,
+                x: 0, y: 0, w: 140, h: 70,
+                color: '#064e3b',
+                border: '#10b981',
+                icon: 'fa-server'
+            },
+            serverB: {
+                id: 'serverB',
+                title: 'Server B',
+                ip: '1.1.1.1',
+                port: 80,
+                x: 0, y: 0, w: 140, h: 70,
+                color: '#78350f',
+                border: '#f59e0b',
+                icon: 'fa-network-wired'
+            },
+            serverC: {
+                id: 'serverC',
+                title: 'Host C (Unknown IP)',
+                ip: '198.51.100.99',
+                port: 5353,
+                x: 0, y: 0, w: 140, h: 65,
+                color: '#3b0764',
+                border: '#a855f7',
+                icon: 'fa-user-secret'
+            }
+        };
+
+        // Active animated packets & explosion particles
+        let packets = [];
+        let particles = [];
+
+        // DOM Element References
+        const canvas = document.getElementById('networkCanvas');
+        const ctx = canvas.getContext('2d');
+        const activeNatTitle = document.getElementById('active-nat-title');
+        const natBadgeFilter = document.getElementById('nat-badge-filter');
+        const natTableBody = document.getElementById('nat-table-body');
+        const packetLog = document.getElementById('packet-log');
+        const canvasStatusPill = document.getElementById('canvas-status-pill');
+
+        // Reset Floating Toast References (Top-Right)
+        const resetToast = document.getElementById('reset-toast');
+        const resetToastMsg = document.getElementById('reset-toast-msg');
+        const resetToastTime = document.getElementById('reset-toast-time');
+        const btnResetToastClose = document.getElementById('btn-reset-toast-close');
+
+        if (btnResetToastClose) {
+            btnResetToastClose.addEventListener('click', () => {
+                if (resetToast) {
+                    resetToast.classList.add('hidden');
+                    resetToast.classList.remove('notify-slide-show');
+                }
+            });
+        }
+
+        // In-Canvas Standard Toast References
+        const canvasToast = document.getElementById('canvas-toast');
+        const canvasToastTitle = document.getElementById('canvas-toast-title');
+        const canvasToastMsg = document.getElementById('canvas-toast-msg');
+        const canvasToastIcon = document.getElementById('canvas-toast-icon');
+
+        // Dynamic Known IP Labels
+        const knownIpIndicator = document.getElementById('known-ip-indicator');
+        const labelKnownSamePort = document.getElementById('label-known-same-port');
+        const subKnownSamePort = document.getElementById('sub-known-same-port');
+        const labelKnownNewPort = document.getElementById('label-known-new-port');
+        const subKnownNewPort = document.getElementById('sub-known-new-port');
+        const labelPeerToMapping = document.getElementById('label-peer-to-mapping');
+        const subPeerToMapping = document.getElementById('sub-peer-to-mapping');
+
+        // Dynamic Matrix Table References
+        const matrixRoleText = document.getElementById('matrix-role-text');
+        const matrixSubKnownSame = document.getElementById('matrix-sub-known-same');
+        const matrixSubKnownDiff = document.getElementById('matrix-sub-known-diff');
+        const matrixTitlePeerToMapping = document.getElementById('matrix-title-peer-to-mapping');
+        const matrixSubPeerToMapping = document.getElementById('matrix-sub-peer-to-mapping');
+        const matrixCellRestrictedPeer = document.getElementById('matrix-cell-restricted-peer');
+        const matrixCellPortRestrictedPeer = document.getElementById('matrix-cell-port-restricted-peer');
+
+        function updateDynamicKnownLabels() {
+            const isBContactedFirst = (firstContactedServer === 'serverB');
+            const knownNode = isBContactedFirst ? nodes.serverB : nodes.serverA;
+            const otherNode = isBContactedFirst ? nodes.serverA : nodes.serverB;
+
+            const knownLetter = isBContactedFirst ? 'B' : 'A';
+            const otherLetter = isBContactedFirst ? 'A' : 'B';
+
+            // Top action trigger indicators
+            if (!firstContactedServer) {
+                if (knownIpIndicator) knownIpIndicator.innerText = `Known IP: None (send outbound packet first)`;
+                if (labelKnownSamePort) labelKnownSamePort.innerText = `Known IP (Same Port)`;
+                if (subKnownSamePort) subKnownSamePort.innerText = `Contact a server first`;
+                if (labelKnownNewPort) labelKnownNewPort.innerText = `Known IP (New Port)`;
+                if (subKnownNewPort) subKnownNewPort.innerText = `Contact a server first`;
+                if (labelPeerToMapping) labelPeerToMapping.innerText = `Peer → Mapping`;
+                if (subPeerToMapping) subPeerToMapping.innerText = `Key P2P question!`;
+            } else {
+                if (knownIpIndicator) {
+                    knownIpIndicator.innerHTML = `Known IP (Contacted 1st): <span class="text-emerald-400 font-bold">Server ${knownLetter} (${knownNode.ip})</span>`;
+                }
+                if (labelKnownSamePort) {
+                    labelKnownSamePort.innerText = `Server ${knownLetter} (Port 80)`;
+                }
+                if (subKnownSamePort) {
+                    subKnownSamePort.innerText = `Known IP (${knownNode.ip}:80)`;
+                }
+                if (labelKnownNewPort) {
+                    labelKnownNewPort.innerText = `Server ${knownLetter} (Port 9999)`;
+                }
+                if (subKnownNewPort) {
+                    subKnownNewPort.innerText = `Known IP (${knownNode.ip}:9999)`;
+                }
+                if (labelPeerToMapping) {
+                    labelPeerToMapping.innerText = `Server ${otherLetter} → Mapping`;
+                }
+                if (subPeerToMapping) {
+                    subPeerToMapping.innerText = `${otherNode.ip}:80 → ${knownLetter}'s port`;
+                }
+            }
+
+            // Update comparison table header badge and table row cells
+            if (matrixRoleText) {
+                matrixRoleText.innerHTML = `
+                    <strong class="text-amber-300 font-bold tracking-wide">${knownLetter}</strong> <span class="text-slate-200">= Server contacted first</span>
+                    <span class="text-amber-500/80 mx-1.5">|</span>
+                    <strong class="text-amber-300 font-bold tracking-wide">${otherLetter}</strong> <span class="text-slate-200">= Different server</span>
+                `;
+            }
+            if (matrixSubKnownSame) {
+                matrixSubKnownSame.innerText = `e.g., ${knownNode.ip}:80 replying`;
+            }
+            if (matrixSubKnownDiff) {
+                matrixSubKnownDiff.innerText = `e.g., ${knownNode.ip} from port 9999`;
+            }
+            if (matrixTitlePeerToMapping) {
+                matrixTitlePeerToMapping.innerText = `${otherLetter} sends to ${knownLetter}'s mapping`;
+            }
+            if (matrixSubPeerToMapping) {
+                matrixSubPeerToMapping.innerText = `Server ${otherLetter} (${otherNode.ip}) to ${knownLetter}'s router port`;
+            }
+        }
+
+        // Resize Canvas dynamically with Retina / HiDPI support
+        let dpr = 1;
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            dpr = window.devicePixelRatio || 1;
+            
+            // Set physical canvas pixels for high DPI displays
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            
+            // Normalize coordinates system to CSS pixels
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(dpr, dpr);
+
+            const w = rect.width;
+            const h = rect.height;
+
+            // Layout coordinates in CSS pixels
+            nodes.device.x = Math.max(16, w * 0.05);
+            nodes.device.y = h * 0.38;
+
+            nodes.router.x = Math.min(w * 0.42, w - 340);
+            nodes.router.y = h * 0.37;
+
+            // Remote Servers on the right
+            const serverRightX = Math.max(nodes.router.x + nodes.router.w + 30, w - 165);
+            nodes.serverA.x = serverRightX;
+            nodes.serverA.y = h * 0.08;
+
+            nodes.serverB.x = serverRightX;
+            nodes.serverB.y = h * 0.40;
+
+            nodes.serverC.x = serverRightX;
+            nodes.serverC.y = h * 0.72;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        // Canvas Direct Click Hit-Testing (Allows clicking Device or Server nodes directly on the canvas)
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            function isInside(node, x, y) {
+                return x >= node.x && x <= node.x + node.w && y >= node.y && y <= node.y + node.h;
+            }
+
+            if (isInside(nodes.device, clickX, clickY)) {
+                // Clicking client device triggers primary outbound packet
+                if (firstContactedServer === 'serverB') {
+                    document.getElementById('act-device-to-b').click();
+                } else {
+                    document.getElementById('act-device-to-a').click();
+                }
+            } else if (isInside(nodes.serverA, clickX, clickY)) {
+                if (firstContactedServer === 'serverA') {
+                    document.getElementById('act-a-reply-same').click();
+                } else if (!firstContactedServer) {
+                    document.getElementById('act-device-to-a').click();
+                } else {
+                    // Server A is the secondary peer
+                    document.getElementById('act-b-to-a-mapping').click();
+                }
+            } else if (isInside(nodes.serverB, clickX, clickY)) {
+                if (firstContactedServer === 'serverB') {
+                    document.getElementById('act-a-reply-same').click();
+                } else if (!firstContactedServer) {
+                    document.getElementById('act-device-to-b').click();
+                } else {
+                    // Server B is the secondary peer
+                    document.getElementById('act-b-to-a-mapping').click();
+                }
+            } else if (isInside(nodes.serverC, clickX, clickY)) {
+                document.getElementById('act-unknown-inbound').click();
+            } else if (isInside(nodes.router, clickX, clickY)) {
+                showCanvasToast('NAT Gateway', `IP: ${nodes.router.ip} | Active mappings: ${natBindings.length}`, true);
+            }
+        });
+
+        // Show standard in-canvas activity toast (for NAT activation, speed, packet firewall events)
+        let canvasToastTimeout = null;
+        function showCanvasToast(title, message, isAllowed = true) {
+            if (!canvasToast) return;
+            clearTimeout(canvasToastTimeout);
+
+            canvasToastTitle.innerText = title;
+            canvasToastMsg.innerText = message;
+
+            if (isAllowed) {
+                canvasToast.className = "absolute bottom-3 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-lg bg-slate-900/95 backdrop-blur-md border border-emerald-500/50 text-xs shadow-[0_8px_24px_rgba(16,185,129,0.2)] flex items-center gap-2.5 max-w-[90%] sm:max-w-md pointer-events-none transition-all duration-200";
+                canvasToastIcon.className = "text-emerald-400 shrink-0 text-sm";
+                canvasToastIcon.innerHTML = `<i class="fa-solid fa-circle-check"></i>`;
+            } else {
+                canvasToast.className = "absolute bottom-3 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-lg bg-slate-900/95 backdrop-blur-md border border-rose-500/50 text-xs shadow-[0_8px_24px_rgba(244,63,94,0.2)] flex items-center gap-2.5 max-w-[90%] sm:max-w-md pointer-events-none transition-all duration-200";
+                canvasToastIcon.className = "text-rose-400 shrink-0 text-sm";
+                canvasToastIcon.innerHTML = `<i class="fa-solid fa-shield-xmark"></i>`;
+            }
+
+            canvasToast.classList.remove('hidden');
+            canvasToastTimeout = setTimeout(() => {
+                canvasToast.classList.add('hidden');
+            }, 3500);
+        }
+
+        // Show Top-Right Floating Notification exclusively for Router State Reset
+        let resetToastTimeout = null;
+        function showResetNotification(message = 'All translation bindings, sessions, and packets have been flushed.') {
+            if (!resetToast) return;
+            clearTimeout(resetToastTimeout);
+
+            if (resetToastMsg) resetToastMsg.innerText = message;
+            if (resetToastTime) resetToastTime.innerText = new Date().toLocaleTimeString();
+
+            resetToast.classList.remove('hidden');
+            resetToast.classList.remove('notify-slide-show');
+            void resetToast.offsetWidth; // Force reflow for keyframe animation
+            resetToast.classList.add('notify-slide-show');
+
+            resetToastTimeout = setTimeout(() => {
+                resetToast.classList.add('hidden');
+                resetToast.classList.remove('notify-slide-show');
+            }, 4000);
+        }
+
+        // Add to Firewall Event Log
+        function addLog(type, result, msg, extra = '') {
+            const time = new Date().toLocaleTimeString();
+            const logItem = document.createElement('div');
+            logItem.className = 'p-2 rounded bg-slate-950/80 border text-[11px] leading-tight flex items-start justify-between gap-2 ' +
+                (result === 'ALLOWED' || result === 'TRANSLATED' 
+                    ? 'border-emerald-500/30 text-emerald-300' 
+                    : 'border-rose-500/40 text-rose-300');
+
+            const icon = result === 'ALLOWED' || result === 'TRANSLATED' 
+                ? '<i class="fa-solid fa-check text-emerald-400 mt-0.5"></i>' 
+                : '<i class="fa-solid fa-ban text-rose-400 mt-0.5"></i>';
+
+            logItem.innerHTML = `
+                <div class="flex items-start gap-1.5">
+                    ${icon}
+                    <div>
+                        <span class="font-bold font-mono">[${result}]</span> ${msg}
+                        ${extra ? `<div class="text-[10px] text-slate-400 mt-0.5 font-sans">${extra}</div>` : ''}
+                    </div>
+                </div>
+                <span class="text-[10px] text-slate-500 whitespace-nowrap">${time}</span>
+            `;
+
+            packetLog.prepend(logItem);
+            while (packetLog.children.length > 25) {
+                packetLog.removeChild(packetLog.lastChild);
+            }
+        }
+
+        // Helper: Get active public port for a destination IP
+        function getActivePublicPort(targetDestIp = null) {
+            if (targetDestIp) {
+                const specificBinding = natBindings.find(b => b.destIp === targetDestIp);
+                if (specificBinding) return specificBinding.publicPort;
+            }
+            if (firstContactedServer) {
+                const firstIp = nodes[firstContactedServer].ip;
+                const firstBinding = natBindings.find(b => b.destIp === firstIp);
+                if (firstBinding) return firstBinding.publicPort;
+            }
+            return (natBindings.length > 0) ? natBindings[0].publicPort : 40001;
+        }
+
+        // Animated Packet Class
+        class AnimatedPacket {
+            constructor(config) {
+                this.fromNode = config.fromNode;
+                this.toNode = config.toNode;
+                this.midNode = config.midNode;
+                this.direction = config.direction; // 'outbound' | 'inbound'
+                this.fromIp = config.fromIp;
+                this.fromPort = config.fromPort;
+                this.toIp = config.toIp;
+                this.toPort = config.toPort;
+                this.targetPublicPort = config.targetPublicPort || 40001;
+                this.label = config.label || '';
+                this.color = config.color || '#10b981';
+
+                this.progress = 0; // 0 to 1
+                this.phase = 1;    // 1: from -> router, 2: router -> target
+                this.isBlocked = false;
+                this.dropAtRouter = false;
+                this.dropReason = '';
+                this.alive = true;
+
+                // Precompute firewall verdict
+                if (this.direction === 'inbound') {
+                    const verdict = evaluateFirewallRule(this.fromIp, this.fromPort, this.targetPublicPort);
+                    this.isBlocked = !verdict.allowed;
+                    this.dropReason = verdict.reason;
+                }
+            }
+
+            update(delta) {
+                const baseSpeed = 0.014 * animSpeedMultiplier;
+                this.progress += baseSpeed;
+
+                if (this.phase === 1 && this.progress >= 1) {
+                    if (this.direction === 'outbound') {
+                        // Router translates outbound packet
+                        handleOutboundPacket(this.toIp, this.toPort, this.toNode.id);
+                        this.phase = 2;
+                        this.progress = 0;
+                    } else {
+                        // Inbound arrives at router
+                        if (this.isBlocked) {
+                            // Firewall rejects packet
+                            spawnExplosion(this.midNode.x + this.midNode.w * 0.9, this.midNode.y + this.midNode.h * 0.5, '#ef4444');
+                            this.alive = false;
+                            showCanvasToast('Packet Dropped by Firewall', this.dropReason, false);
+                            addLog('inbound', 'BLOCKED', `Inbound from ${this.fromIp}:${this.fromPort} dropped at port ${this.targetPublicPort}`, this.dropReason);
+                        } else {
+                            // Firewall permits packet through
+                            this.phase = 2;
+                            this.progress = 0;
+                            showCanvasToast('Inbound Packet Permitted', `Translated port ${this.targetPublicPort} → 192.168.1.5:5000`, true);
+                            addLog('inbound', 'ALLOWED', `Inbound from ${this.fromIp}:${this.fromPort} permitted through port ${this.targetPublicPort}`, `Forwarded to 192.168.1.5:5000`);
+                        }
+                    }
+                } else if (this.phase === 2 && this.progress >= 1) {
+                    // Packet completed its journey
+                    this.alive = false;
+                    spawnExplosion(
+                        this.toNode.x + this.toNode.w / 2, 
+                        this.toNode.y + this.toNode.h / 2, 
+                        this.color,
+                        6
+                    );
+                    if (this.direction === 'outbound') {
+                        addLog('outbound', 'TRANSLATED', `Outbound to ${this.toIp}:${this.toPort} reached destination successfully`, `NAT mapped via public port ${this.targetPublicPort}`);
+                    }
+                }
+            }
+
+            draw() {
+                let startX, startY, endX, endY;
+
+                if (this.phase === 1) {
+                    if (this.direction === 'outbound') {
+                        startX = this.fromNode.x + this.fromNode.w;
+                        startY = this.fromNode.y + this.fromNode.h / 2;
+                        endX = this.midNode.x;
+                        endY = this.midNode.y + this.midNode.h / 2;
+                    } else {
+                        startX = this.fromNode.x;
+                        startY = this.fromNode.y + this.fromNode.h / 2;
+                        endX = this.midNode.x + this.midNode.w;
+                        endY = this.midNode.y + this.midNode.h / 2;
+                    }
+                } else {
+                    if (this.direction === 'outbound') {
+                        startX = this.midNode.x + this.midNode.w;
+                        startY = this.midNode.y + this.midNode.h / 2;
+                        endX = this.toNode.x;
+                        endY = this.toNode.y + this.toNode.h / 2;
+                    } else {
+                        startX = this.midNode.x;
+                        startY = this.midNode.y + this.midNode.h / 2;
+                        endX = this.toNode.x + this.toNode.w;
+                        endY = this.toNode.y + this.toNode.h / 2;
+                    }
+                }
+
+                const curX = startX + (endX - startX) * this.progress;
+                const curY = startY + (endY - startY) * this.progress;
+
+                // Draw glowing packet circle
+                ctx.save();
+                ctx.shadowColor = this.color;
+                ctx.shadowBlur = 12;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(curX, curY, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(curX, curY, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                // Draw packet header label above circle
+                if (showPacketLabels && this.label) {
+                    ctx.save();
+                    ctx.font = '600 10px JetBrains Mono, monospace';
+                    const textWidth = ctx.measureText(this.label).width;
+
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+                    ctx.strokeStyle = this.color;
+                    ctx.lineWidth = 1;
+                    
+                    const boxX = curX - textWidth / 2 - 6;
+                    const boxY = curY - 24;
+                    ctx.beginPath();
+                    ctx.roundRect(boxX, boxY, textWidth + 12, 18, 4);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#f8fafc';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(this.label, curX, boxY + 12);
+                    ctx.restore();
+                }
+            }
+        }
+
+        // Particle explosion effect
+        function spawnExplosion(x, y, color, count = 16) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1.5 + Math.random() * 3.5;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    radius: 2 + Math.random() * 2.5,
+                    color: color,
+                    alpha: 1,
+                    decay: 0.025 + Math.random() * 0.03
+                });
+            }
+        }
+
+        // Evaluate Inbound Firewall Rules
+        function evaluateFirewallRule(sourceIp, sourcePort, incomingPublicPort) {
+            const binding = natBindings.find(b => b.publicPort === incomingPublicPort);
+
+            if (!binding) {
+                return {
+                    allowed: false,
+                    reason: `No translation session exists on public port ${incomingPublicPort}. Unsolicited external packet dropped.`
+                };
+            }
+
+            if (currentNat === 'full-cone') {
+                return {
+                    allowed: true,
+                    reason: `Full Cone NAT has NO packet filtering. Any external IP:port can traverse the open mapped port (${incomingPublicPort}).`
+                };
+            }
+
+            if (currentNat === 'restricted') {
+                const ipAllowed = binding.allowedIps.includes(sourceIp);
+                if (ipAllowed) {
+                    return {
+                        allowed: true,
+                        reason: `Restricted NAT matches sender IP (${sourceIp}). Port variation is permitted because it filters by IP only.`
+                    };
+                } else {
+                    return {
+                        allowed: false,
+                        reason: `Restricted NAT rejected packet from unknown IP (${sourceIp}). Client never sent outbound traffic to this IP address.`
+                    };
+                }
+            }
+
+            if (currentNat === 'port-restricted') {
+                const exactMatch = binding.allowedIpPorts.some(ep => ep.ip === sourceIp && ep.port === sourcePort);
+                if (exactMatch) {
+                    return {
+                        allowed: true,
+                        reason: `Port-Restricted NAT verified both remote IP (${sourceIp}) AND remote port (${sourcePort}). Packet permitted.`
+                    };
+                } else {
+                    const ipOnly = binding.allowedIps.includes(sourceIp);
+                    if (ipOnly) {
+                        return {
+                            allowed: false,
+                            reason: `Port-Restricted NAT blocked ${sourceIp}:${sourcePort}. Client contacted this IP on a DIFFERENT port, but Port-Restricted enforces exact port match.`
+                        };
+                    } else {
+                        return {
+                            allowed: false,
+                            reason: `Port-Restricted NAT blocked unsolicited packet from ${sourceIp}:${sourcePort} (unknown endpoint).`
+                        };
+                    }
+                }
+            }
+
+            if (currentNat === 'symmetric') {
+                if (binding.destIp === sourceIp && binding.destPort === sourcePort) {
+                    return {
+                        allowed: true,
+                        reason: `Symmetric NAT verified packet belongs to exact 1:1 session with ${sourceIp}:${sourcePort} on dedicated port ${binding.publicPort}.`
+                    };
+                } else {
+                    return {
+                        allowed: false,
+                        reason: `Symmetric NAT drops packet from ${sourceIp}:${sourcePort}. Port ${binding.publicPort} is bound exclusively to ${binding.destIp}:${binding.destPort}.`
+                    };
+                }
+            }
+
+            return { allowed: false, reason: 'Unknown NAT rule evaluation' };
+        }
+
+        // Router Mapping Logic when client sends outbound packet
+        function handleOutboundPacket(destIp, destPort, destNodeId) {
+            const localIp = nodes.device.ip;
+            const localPort = nodes.device.port;
+            const publicIp = nodes.router.ip;
+
+            // Register first contacted server if not set
+            if (!firstContactedServer) {
+                firstContactedServer = destNodeId;
+                updateDynamicKnownLabels();
+            }
+
+            let binding = null;
+
+            if (currentNat === 'symmetric') {
+                // Symmetric NAT: creates a separate public port for EACH unique remote destination
+                binding = natBindings.find(b => b.destIp === destIp && b.destPort === destPort);
+                if (!binding) {
+                    const newPort = 40001 + natBindings.length;
+                    binding = {
+                        localIp,
+                        localPort,
+                        publicIp,
+                        publicPort: newPort,
+                        destIp,
+                        destPort,
+                        allowedIps: [destIp],
+                        allowedIpPorts: [{ ip: destIp, port: destPort }]
+                    };
+                    natBindings.push(binding);
+                }
+            } else {
+                // Cone NATs (Full Cone, Restricted, Port-Restricted): share the SAME public port (40001)
+                if (natBindings.length === 0) {
+                    binding = {
+                        localIp,
+                        localPort,
+                        publicIp,
+                        publicPort: 40001,
+                        destIp,
+                        destPort,
+                        allowedIps: [destIp],
+                        allowedIpPorts: [{ ip: destIp, port: destPort }]
+                    };
+                    natBindings.push(binding);
+                } else {
+                    binding = natBindings[0];
+                    if (!binding.allowedIps.includes(destIp)) {
+                        binding.allowedIps.push(destIp);
+                    }
+                    if (!binding.allowedIpPorts.some(ep => ep.ip === destIp && ep.port === destPort)) {
+                        binding.allowedIpPorts.push({ ip: destIp, port: destPort });
+                    }
+                }
+            }
+
+            updateNatTable();
+        }
+
+        // Update HTML NAT Translation Table
+        function updateNatTable() {
+            if (natBindings.length === 0) {
+                natTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="p-4 text-center text-slate-500 font-sans italic text-xs">
+                            No active mappings yet. Click <span class="text-emerald-400 font-mono font-semibold">Device &rarr; Server A</span> or <span class="text-amber-400 font-mono font-semibold">Device &rarr; Server B</span> to open a session!
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let rows = '';
+            natBindings.forEach((b) => {
+                let allowedText = '';
+                if (currentNat === 'full-cone') {
+                    allowedText = '<span class="text-emerald-400 font-semibold">* (Any external host)</span>';
+                } else if (currentNat === 'restricted') {
+                    allowedText = `<span class="text-cyan-300">${b.allowedIps.join(', ')} (Any port)</span>`;
+                } else if (currentNat === 'port-restricted') {
+                    allowedText = `<span class="text-indigo-300">${b.allowedIpPorts.map(e => `${e.ip}:${e.port}`).join(', ')}</span>`;
+                } else if (currentNat === 'symmetric') {
+                    allowedText = `<span class="text-rose-300 font-bold">${b.destIp}:${b.destPort} (Strict 1:1)</span>`;
+                }
+
+                rows += `
+                    <tr class="hover:bg-slate-800/40 font-mono text-xs">
+                        <td class="p-2 text-slate-300">${b.localIp}:${b.localPort}</td>
+                        <td class="p-2 text-emerald-400 font-bold">${b.publicIp}:${b.publicPort}</td>
+                        <td class="p-2 text-slate-400">${b.destIp}:${b.destPort}</td>
+                        <td class="p-2">${allowedText}</td>
+                        <td class="p-2 text-right">
+                            <span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Active</span>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            natTableBody.innerHTML = rows;
+        }
+
+        // Draw Network Topology Canvas
+        function drawCanvas() {
+            const cssWidth = canvas.width / dpr;
+            const cssHeight = canvas.height / dpr;
+
+            ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+            // Subtle grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
+            ctx.lineWidth = 1;
+            const gridSize = 24;
+            for (let x = 0; x < cssWidth; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, cssHeight);
+                ctx.stroke();
+            }
+            for (let y = 0; y < cssHeight; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(cssWidth, y);
+                ctx.stroke();
+            }
+
+            // Connection Lines
+            drawLink(nodes.device, nodes.router, '#64748b', 'LAN (192.168.1.0/24)', false);
+            drawLink(nodes.router, nodes.serverA, '#10b981', 'Primary Link (A)', false);
+            drawLink(nodes.router, nodes.serverB, '#f59e0b', 'Alternative Link (B)', true);
+            drawLink(nodes.router, nodes.serverC, '#a855f7', 'External Internet (C)', true);
+
+            // Draw Nodes
+            Object.values(nodes).forEach(node => {
+                drawNode(node);
+            });
+
+            // Draw Active Animated Packets (Delta scaled to 60fps standard)
+            for (let i = packets.length - 1; i >= 0; i--) {
+                const p = packets[i];
+                p.update(1);
+                p.draw();
+                if (!p.alive) {
+                    packets.splice(i, 1);
+                }
+            }
+
+            // Draw Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const part = particles[i];
+                part.x += part.vx;
+                part.y += part.vy;
+                part.alpha -= part.decay;
+
+                if (part.alpha <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = part.alpha;
+                ctx.fillStyle = part.color;
+                ctx.beginPath();
+                ctx.arc(part.x, part.y, part.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // Draw Link between nodes
+        function drawLink(nodeA, nodeB, color, label, isDashed = false) {
+            const startX = nodeA.x + nodeA.w;
+            const startY = nodeA.y + nodeA.h / 2;
+            const endX = nodeB.x;
+            const endY = nodeB.y + nodeB.h / 2;
+
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            if (isDashed) {
+                ctx.setLineDash([5, 5]);
+            } else {
+                ctx.setLineDash([]);
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+
+            // Arrowhead at center
+            const midX = (startX + endX) / 2;
+            const midY = (startY + endY) / 2;
+            const angle = Math.atan2(endY - startY, endX - startX);
+            
+            ctx.setLineDash([]);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(midX, midY);
+            ctx.lineTo(midX - 7 * Math.cos(angle - Math.PI / 6), midY - 7 * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(midX - 7 * Math.cos(angle + Math.PI / 6), midY - 7 * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // Draw Network Box Node
+        function drawNode(node) {
+            ctx.save();
+            // Background Box with rounded corners
+            ctx.fillStyle = node.color;
+            ctx.strokeStyle = node.border;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(node.x, node.y, node.w, node.h, 10);
+            ctx.fill();
+            ctx.stroke();
+
+            // Title
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            
+            let displayTitle = node.title;
+            if (node.id === 'serverA' || node.id === 'serverB') {
+                if (firstContactedServer === node.id) {
+                    displayTitle += ' [KNOWN 1st]';
+                } else if (firstContactedServer !== null) {
+                    displayTitle += ' [PEER]';
+                }
+            }
+            ctx.fillText(displayTitle, node.x + node.w / 2, node.y + 24);
+
+            // Subtitle / Address info
+            ctx.font = '11px JetBrains Mono, monospace';
+            if (node.id === 'router') {
+                const portDisplay = natBindings.length > 0 
+                    ? natBindings.map(b => b.publicPort).join(', ') 
+                    : '40001';
+                ctx.fillStyle = '#a5b4fc';
+                ctx.fillText(`Public: ${node.ip}`, node.x + node.w / 2, node.y + 42);
+                ctx.fillStyle = '#c7d2fe';
+                ctx.font = '10px JetBrains Mono, monospace';
+                ctx.fillText(`Ports: ${portDisplay}`, node.x + node.w / 2, node.y + 58);
+            } else {
+                ctx.fillStyle = '#94a3b8';
+                ctx.fillText(`${node.ip}:${node.port}`, node.x + node.w / 2, node.y + 44);
+            }
+
+            ctx.restore();
+        }
+
+        // Set Active NAT Type
+        function setNatType(natType) {
+            currentNat = natType;
+
+            // Reset ribbon buttons styling
+            const buttons = {
+                'full-cone': document.getElementById('btn-nat-full-cone'),
+                'restricted': document.getElementById('btn-nat-restricted'),
+                'port-restricted': document.getElementById('btn-nat-port-restricted'),
+                'symmetric': document.getElementById('btn-nat-symmetric')
+            };
+
+            const titles = {
+                'full-cone': 'Full Cone NAT (No Filter)',
+                'restricted': 'Restricted Cone NAT (Filter by IP)',
+                'port-restricted': 'Port-Restricted Cone NAT (Filter by IP & Port)',
+                'symmetric': 'Symmetric NAT (Unique Port per Remote Server)'
+            };
+
+            const filters = {
+                'full-cone': 'Filter: NONE (Open hole)',
+                'restricted': 'Filter: REMOTE IP ONLY',
+                'port-restricted': 'Filter: REMOTE IP + PORT',
+                'symmetric': 'Filter: STRICT 1-TO-1 SESSION'
+            };
+
+            Object.entries(buttons).forEach(([key, btn]) => {
+                if (!btn) return;
+                if (key === natType) {
+                    btn.className = "nat-type-btn p-3 rounded-lg border-2 border-emerald-400 bg-emerald-950/50 text-left transition shadow-lg flex flex-col justify-between";
+                } else {
+                    btn.className = "nat-type-btn p-3 rounded-lg border border-slate-700 bg-slate-800/60 text-left transition hover:border-slate-500 flex flex-col justify-between";
+                }
+            });
+
+            if (activeNatTitle) activeNatTitle.innerText = titles[natType];
+            if (natBadgeFilter) natBadgeFilter.innerText = filters[natType];
+            if (canvasStatusPill) canvasStatusPill.innerText = `NAT: ${titles[natType].split('(')[0]}`;
+
+            // Reset router state table on NAT architecture switch to reflect real-world conntrack flush
+            natBindings = [];
+            packets = [];
+            firstContactedServer = null;
+            updateDynamicKnownLabels();
+            updateNatTable();
+
+            addLog('outbound', 'TRANSLATED', `NAT architecture changed to: ${titles[natType]}`, 'State flushed: Auto-seeding initial outbound flow to Server A');
+            showCanvasToast(`${titles[natType].split('(')[0].trim()} Activated`, 'State flushed. Sending initial Device → Server A packet...', true);
+
+            // Automatically emit Device -> Server A to establish initial mapping for the new NAT type
+            setTimeout(() => {
+                const btnA = document.getElementById('act-device-to-a');
+                if (btnA) btnA.click();
+            }, 250);
+        }
+
+        // Setup Event Listeners for NAT Buttons
+        document.getElementById('btn-nat-full-cone').addEventListener('click', () => setNatType('full-cone'));
+        document.getElementById('btn-nat-restricted').addEventListener('click', () => setNatType('restricted'));
+        document.getElementById('btn-nat-port-restricted').addEventListener('click', () => setNatType('port-restricted'));
+        document.getElementById('btn-nat-symmetric').addEventListener('click', () => setNatType('symmetric'));
+
+        // Speed Multiplier Buttons (0.3x, 0.5x, 1x, 2x)
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.speed-btn').forEach(b => {
+                    b.className = "speed-btn px-1.5 py-0.5 rounded text-[11px] text-slate-400 hover:text-white transition";
+                });
+                btn.className = "speed-btn px-1.5 py-0.5 rounded text-[11px] bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 transition";
+                animSpeedMultiplier = parseFloat(btn.dataset.speed);
+                showCanvasToast('Animation Speed', `Simulation running at ${animSpeedMultiplier}x speed`, true);
+            });
+        });
+
+        // Toggle Packet Headers
+        document.getElementById('chk-packet-labels').addEventListener('change', (e) => {
+            showPacketLabels = e.target.checked;
+        });
+
+        // 1. Device -> Server A
+        document.getElementById('act-device-to-a').addEventListener('click', () => {
+            if (!firstContactedServer) {
+                firstContactedServer = 'serverA';
+                updateDynamicKnownLabels();
+            }
+            packets.push(new AnimatedPacket({
+                fromNode: nodes.device,
+                midNode: nodes.router,
+                toNode: nodes.serverA,
+                direction: 'outbound',
+                fromIp: nodes.device.ip,
+                fromPort: nodes.device.port,
+                toIp: nodes.serverA.ip,
+                toPort: nodes.serverA.port,
+                label: `OUT: 192.168.1.5:5000 → 8.8.8.8:80`,
+                color: '#34d399'
+            }));
+        });
+
+        // 2. Device -> Server B
+        document.getElementById('act-device-to-b').addEventListener('click', () => {
+            if (!firstContactedServer) {
+                firstContactedServer = 'serverB';
+                updateDynamicKnownLabels();
+            }
+            packets.push(new AnimatedPacket({
+                fromNode: nodes.device,
+                midNode: nodes.router,
+                toNode: nodes.serverB,
+                direction: 'outbound',
+                fromIp: nodes.device.ip,
+                fromPort: nodes.device.port,
+                toIp: nodes.serverB.ip,
+                toPort: nodes.serverB.port,
+                label: `OUT: 192.168.1.5:5000 → 1.1.1.1:80`,
+                color: '#f59e0b'
+            }));
+        });
+
+        // 3. Known IP replies (Known IP, same port 80)
+        document.getElementById('act-a-reply-same').addEventListener('click', () => {
+            const knownNodeKey = firstContactedServer || 'serverA';
+            const knownNode = nodes[knownNodeKey];
+            const targetPort = getActivePublicPort(knownNode.ip);
+
+            packets.push(new AnimatedPacket({
+                fromNode: knownNode,
+                midNode: nodes.router,
+                toNode: nodes.device,
+                direction: 'inbound',
+                fromIp: knownNode.ip,
+                fromPort: 80,
+                toIp: nodes.device.ip,
+                toPort: nodes.device.port,
+                targetPublicPort: targetPort,
+                label: `IN: ${knownNode.ip}:80 → :${targetPort}`,
+                color: knownNodeKey === 'serverB' ? '#f59e0b' : '#38bdf8'
+            }));
+        });
+
+        // 4. Known IP replies from new port (Known IP, new port 9999)
+        document.getElementById('act-a-reply-diff').addEventListener('click', () => {
+            const knownNodeKey = firstContactedServer || 'serverA';
+            const knownNode = nodes[knownNodeKey];
+            const targetPort = getActivePublicPort(knownNode.ip);
+
+            packets.push(new AnimatedPacket({
+                fromNode: knownNode,
+                midNode: nodes.router,
+                toNode: nodes.device,
+                direction: 'inbound',
+                fromIp: knownNode.ip,
+                fromPort: 9999,
+                toIp: nodes.device.ip,
+                toPort: nodes.device.port,
+                targetPublicPort: targetPort,
+                label: `IN: ${knownNode.ip}:9999 → :${targetPort}`,
+                color: '#fbbf24'
+            }));
+        });
+
+        // 5. Unknown IP (Host C unsolicited inbound)
+        document.getElementById('act-unknown-inbound').addEventListener('click', () => {
+            const targetPort = getActivePublicPort();
+            packets.push(new AnimatedPacket({
+                fromNode: nodes.serverC,
+                midNode: nodes.router,
+                toNode: nodes.device,
+                direction: 'inbound',
+                fromIp: nodes.serverC.ip,
+                fromPort: nodes.serverC.port,
+                toIp: nodes.device.ip,
+                toPort: nodes.device.port,
+                targetPublicPort: targetPort,
+                label: `IN: 198.51.100.99:5353 → :${targetPort}`,
+                color: '#a855f7'
+            }));
+        });
+
+        // 6. Other peer sends packet to active mapping
+        document.getElementById('act-b-to-a-mapping').addEventListener('click', () => {
+            const peerNodeKey = (firstContactedServer === 'serverB') ? 'serverA' : 'serverB';
+            const peerNode = nodes[peerNodeKey];
+            const knownNodeKey = (peerNodeKey === 'serverB') ? 'serverA' : 'serverB';
+            const knownNode = nodes[knownNodeKey];
+
+            const targetBinding = natBindings.find(b => b.destIp === knownNode.ip);
+            const targetPort = targetBinding ? targetBinding.publicPort : getActivePublicPort();
+
+            packets.push(new AnimatedPacket({
+                fromNode: peerNode,
+                midNode: nodes.router,
+                toNode: nodes.device,
+                direction: 'inbound',
+                fromIp: peerNode.ip,
+                fromPort: 80,
+                toIp: nodes.device.ip,
+                toPort: nodes.device.port,
+                targetPublicPort: targetPort,
+                label: `IN: ${peerNode.ip}:80 → :${targetPort}`,
+                color: '#f97316'
+            }));
+        });
+
+        // Trigger matrix cell shortcut
+        window.triggerScenario = function(natMode, scenario) {
+            setNatType(natMode);
+            
+            // Respect who is currently contacted or default to server A
+            const targetFirstServerKey = firstContactedServer || 'serverA';
+            const targetFirstServerNode = nodes[targetFirstServerKey];
+
+            const hasContacted = natBindings.some(b => b.destIp === targetFirstServerNode.ip);
+            if (!hasContacted) {
+                firstContactedServer = targetFirstServerKey;
+                handleOutboundPacket(targetFirstServerNode.ip, targetFirstServerNode.port, targetFirstServerKey);
+                updateDynamicKnownLabels();
+                addLog('outbound', 'TRANSLATED', `Pre-established outbound flow to ${targetFirstServerNode.title} (${targetFirstServerNode.ip}:${targetFirstServerNode.port})`, 'Initial Setup');
+            }
+
+            if (scenario === 'a-reply-same') {
+                document.getElementById('act-a-reply-same').click();
+            } else if (scenario === 'a-reply-diff') {
+                document.getElementById('act-a-reply-diff').click();
+            } else if (scenario === 'unknown-inbound') {
+                document.getElementById('act-unknown-inbound').click();
+            } else if (scenario === 'b-to-a-mapping') {
+                document.getElementById('act-b-to-a-mapping').click();
+            }
+        };
+
+        // Reset Router State
+        document.getElementById('btn-reset-simulation').addEventListener('click', () => {
+            natBindings = [];
+            packets = [];
+            firstContactedServer = null;
+            updateDynamicKnownLabels();
+            updateNatTable();
+            addLog('outbound', 'TRANSLATED', 'Router state reset. All translation tables cleared.', 'State Flush');
+            showResetNotification('All translation bindings, sessions, and packets have been flushed.');
+        });
+
+        // Clear Log
+        document.getElementById('btn-clear-log').addEventListener('click', () => {
+            packetLog.innerHTML = '<div class="p-2 rounded bg-slate-950/60 border border-slate-800 text-slate-400">[Log cleared]</div>';
+        });
+
+        // Dismiss Guide Banner
+        const btnToggleGuide = document.getElementById('btn-toggle-guide');
+        if (btnToggleGuide) {
+            btnToggleGuide.addEventListener('click', () => {
+                const banner = document.getElementById('guide-banner');
+                if (banner) banner.style.display = 'none';
+            });
+        }
+
+        // Tour Modal Data & Logic
+        const tourSteps = [
+            {
+                title: "1. Select NAT Architecture",
+                body: "Click on one of the 4 NAT buttons in the top ribbon (Full Cone, Restricted, Port-Restricted, or Symmetric). Observe how the filtering rules change from open to strict.",
+                targetId: "tour-step-nat-ribbon"
+            },
+            {
+                title: "2. Inject Outbound & Inbound Packets",
+                body: "Click <strong>Device → Server A</strong> to punch an outbound hole in the NAT router. Then test inbound packets from Known IP, a new port, or Host C to watch the firewall evaluate the packet in real-time.",
+                targetId: "tour-step-triggers"
+            },
+            {
+                title: "3. Inspect NAT State & Firewall Logs",
+                body: "Watch the active translation table map local sockets (192.168.1.5:5000) to public ports (203.0.113.7:40001). Symmetric NAT dynamically generates separate public ports for each destination.",
+                targetId: "tour-step-tables"
+            },
+            {
+                title: "4. Interactive Comparison Matrix",
+                body: "Every single cell in the 'Who can send inbound traffic?' table is clickable! Click any cell to automatically test that exact combination on the network canvas.",
+                targetId: "tour-step-matrix"
+            }
+        ];
+
+        let currentTourStep = 0;
+        const tourModal = document.getElementById('tour-modal');
+        const tourTitle = document.getElementById('tour-step-title');
+        const tourBody = document.getElementById('tour-step-body');
+        const btnTourPrev = document.getElementById('btn-tour-prev');
+        const btnTourNext = document.getElementById('btn-tour-next');
+        const tourDots = document.getElementById('tour-dots');
+
+        function renderTourStep(stepIndex) {
+            currentTourStep = stepIndex;
+            const step = tourSteps[stepIndex];
+            tourTitle.innerText = `Quick Tour (${stepIndex + 1}/${tourSteps.length}): ${step.title}`;
+            tourBody.innerHTML = step.body;
+
+            btnTourPrev.disabled = stepIndex === 0;
+            btnTourNext.innerText = stepIndex === tourSteps.length - 1 ? 'Finish' : 'Next';
+
+            tourDots.innerHTML = tourSteps.map((_, i) => 
+                `<span class="w-2 h-2 rounded-full ${i === stepIndex ? 'bg-emerald-400' : 'bg-slate-700'}"></span>`
+            ).join('');
+
+            const targetEl = document.getElementById(step.targetId);
+            if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        document.getElementById('btn-quick-tour').addEventListener('click', () => {
+            tourModal.classList.remove('hidden');
+            renderTourStep(0);
+        });
+
+        document.getElementById('btn-close-modal').addEventListener('click', () => {
+            tourModal.classList.add('hidden');
+        });
+
+        btnTourPrev.addEventListener('click', () => {
+            if (currentTourStep > 0) renderTourStep(currentTourStep - 1);
+        });
+
+        btnTourNext.addEventListener('click', () => {
+            if (currentTourStep < tourSteps.length - 1) {
+                renderTourStep(currentTourStep + 1);
+            } else {
+                tourModal.classList.add('hidden');
+            }
+        });
+
+        // Animation Loop with delta time safeguard
+        let lastTime = 0;
+        function animate(timestamp) {
+            drawCanvas();
+            requestAnimationFrame(animate);
+        }
+
+        // Window Load Initialization
+        window.onload = function() {
+            resizeCanvas();
+            setNatType('full-cone');
+            updateDynamicKnownLabels();
+            
+            // Seed initial Device -> Server A packet for instant visualization
+            setTimeout(() => {
+                const btnA = document.getElementById('act-device-to-a');
+                if (btnA) btnA.click();
+            }, 400);
+
+            requestAnimationFrame(animate);
+        };
+    </script>
+</body>
+</html>
